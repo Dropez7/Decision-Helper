@@ -3,29 +3,26 @@ interface Item {
   id: number;
   name: string;
   group?: string;
-  isEditing?: boolean;  // Adiciona um campo para controlar o estado de edição
+  isEditing?: boolean;
+}
+
+interface ExclusiveGroups {
+  [key: string]: Item[];
 }
 
 // Listas de itens e grupos exclusivos
 let items: Item[] = [];
-let exclusiveGroups: string[] = [];
-let isEditingItem = false; // Controla se algum item está em edição
-let isEditingGroup = false; // Controla se algum grupo está em edição
+let exclusiveGroups: ExclusiveGroups = {};
+let isEditingItem = false;
+let isEditingGroup = false;
 
 // Selecionando elementos do DOM
 const generalList = document.getElementById("generalList") as HTMLUListElement;
-const exclusiveContainer = document.getElementById(
-  "exclusiveContainer"
-) as HTMLDivElement;
-const addGeneralBtn = document.getElementById(
-  "addGeneralBtn"
-) as HTMLButtonElement;
-const addExclusiveGroupBtn = document.getElementById(
-  "addExclusiveGroupBtn"
-) as HTMLButtonElement;
-const exclusiveList = document.getElementById("exclusiveList") as HTMLUListElement;
-const numToDraw = document.getElementById("numToDraw") as HTMLInputElement;
+const exclusiveContainer = document.getElementById("exclusiveContainer") as HTMLDivElement;
+const addGeneralBtn = document.getElementById("addGeneralBtn") as HTMLButtonElement;
+const addNewExclusiveGroupBtn = document.getElementById("addNewExclusiveGroupBtn") as HTMLButtonElement;
 const drawBtn = document.getElementById("drawBtn") as HTMLButtonElement;
+const numToDrawElement = document.getElementById("numToDraw") as HTMLInputElement | null;
 const resultDiv = document.getElementById("result") as HTMLDivElement;
 
 // Salva os itens no localStorage
@@ -42,88 +39,41 @@ function loadItems(): void {
   if (savedItems) items = JSON.parse(savedItems);
   if (savedGroups) exclusiveGroups = JSON.parse(savedGroups);
 
-  renderLists(); // Chama renderLists após carregar os itens
+  renderLists();
 }
 
 // Renderiza os itens na tela
 function renderLists(): void {
   generalList.innerHTML = "";
-  exclusiveList.innerHTML = "";  // Clear the exclusive group list
+  exclusiveContainer.innerHTML = "";
 
-  const maxItems = 100; // Limitar a 100 itens
-  
-  const generalItems = items.filter((item) => !item.group).slice(0, maxItems);
-  generalItems.forEach((item) => addGeneralList(item, generalList));
-
-  exclusiveGroups.forEach((group) => addExclusiveGroup(group, exclusiveList));  // Renderiza os grupos exclusivos
+  items.filter((item) => !item.group).forEach((item) => addGeneralGroupItem(item, generalList));
+  Object.keys(exclusiveGroups).forEach((group) => addExclusiveGroup(group, exclusiveGroups[group]));
 }
 
-
-function addGeneralList(item: Item, list: HTMLUListElement): void {
+// Função para adicionar ou editar item na lista geral
+function addGeneralGroupItem(item: Item, list: HTMLUListElement): void {
   const li = document.createElement("li");
-  li.className =
-    "list-group-item d-flex justify-content-between align-items-center bg-dark text-white border-0";
+  li.className = "list-group-item d-flex justify-content-between align-items-center bg-dark text-white border-0";
 
   const input = document.createElement("input");
-
   input.type = "text";
   input.value = item.name;
-  input.disabled = !item.isEditing;  // Se o item não está em edição, desabilita o input
+  input.disabled = !item.isEditing;
   input.className = "form-control me-2 bg-dark text-white border-0";
 
+  // Se o input perder o foco
   input.onblur = () => {
-    item.name = input.value;
-    item.isEditing = false; // Marca como não editando após perder o foco
-    isEditingItem = false; // Atualiza o controle de edição
-    saveItems();
-    renderLists(); // Re-renderiza a lista para refletir as mudanças
-  };
-
-  const editBtn = document.createElement("button");
-  editBtn.className = "btn btn-primary me-2";
-  editBtn.textContent = "✏️";
-  editBtn.onclick = () => {
-    item.isEditing = true; // Marca o item como em edição
-    isEditingItem = true; // Marca que estamos editando um item
-    renderLists(); // Re-renderiza a lista para aplicar as mudanças
-  };
-
-  const removeBtn = document.createElement("button");
-  removeBtn.className = "btn btn-danger";
-  removeBtn.textContent = "🗑️";
-  removeBtn.onclick = () => removeItem(item.id);
-
-  // Adiciona os elementos ao li
-  li.appendChild(input);
-  li.appendChild(editBtn);
-  li.appendChild(removeBtn);
-  list.appendChild(li);
-
-  // Foca no input assim que ele for inserido no DOM
-  if (item.isEditing) {
-    input.focus();
-  }
-}
-
-function addExclusiveGroup(group: string, list: HTMLUListElement): void {
-  const li = document.createElement("li");
-  li.className =
-    "list-group-item d-flex justify-content-between align-items-center bg-dark text-white border-0";
-
-  const input = document.createElement("input");
-
-  input.type = "text";
-  input.value = group;
-  input.disabled = false;  // O grupo sempre estará disponível para edição ao ser criado
-  input.className = "form-control me-2 bg-dark text-white border-0";
-
-  input.onblur = () => {
-    const index = exclusiveGroups.indexOf(group);
-    if (index !== -1) {
-      exclusiveGroups[index] = input.value;
-      isEditingGroup = false; // Atualiza o controle de edição do grupo
+    if (input.value.trim() === "") {
+      // Se o input estiver vazio, remove o item
+      removeItem(item.id);
+    } else {
+      // Caso contrário, salva o item
+      item.name = input.value;
+      item.isEditing = false;
+      isEditingItem = false;
       saveItems();
-      renderLists(); // Re-renderiza a lista para refletir as mudanças
+      renderLists();
     }
   };
 
@@ -131,27 +81,157 @@ function addExclusiveGroup(group: string, list: HTMLUListElement): void {
   editBtn.className = "btn btn-primary me-2";
   editBtn.textContent = "✏️";
   editBtn.onclick = () => {
-    input.disabled = false; // Ativa o input para edição
-    input.focus();  // Foca no input
-    isEditingGroup = true; // Marca que estamos editando um grupo
+    item.isEditing = true;
+    isEditingItem = true;
+    renderLists();
   };
 
   const removeBtn = document.createElement("button");
   removeBtn.className = "btn btn-danger";
   removeBtn.textContent = "🗑️";
-  removeBtn.onclick = () => removeExclusiveGroup(group);
+  removeBtn.onclick = () => removeItem(item.id);
 
-  // Adiciona os elementos ao li
   li.appendChild(input);
   li.appendChild(editBtn);
   li.appendChild(removeBtn);
   list.appendChild(li);
 
-  // Foca no input apenas quando o grupo está sendo editado
-  if (isEditingGroup) {
-    input.focus();
+  if (item.isEditing) {
+    input.focus();  // Dá o foco ao input quando o item estiver em edição
   }
 }
+
+// Função para adicionar um item a um grupo exclusivo
+function addExclusiveGroupItem(item: Item, exclusiveGroup: HTMLUListElement): void {
+  const li = document.createElement("li");
+  li.className = "list-group-item d-flex justify-content-between align-items-center bg-dark text-white border-0";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = item.name;
+  input.disabled = !item.isEditing;
+  input.className = "form-control me-2 bg-dark text-white border-0";
+
+  input.onblur = () => {
+    if (input.value.trim() === "") {
+      // Se o campo estiver vazio, o item é removido
+      removeItem(item.id);
+    } else {
+      item.name = input.value;
+      item.isEditing = false;
+      isEditingItem = false;
+      saveItems();
+      renderLists();
+    }
+  };
+
+  const editBtn = document.createElement("button");
+  editBtn.className = "btn btn-primary me-2";
+  editBtn.textContent = "✏️";
+  editBtn.onclick = () => {
+    item.isEditing = true;
+    isEditingItem = true;
+    renderLists();
+  };
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "btn btn-danger";
+  removeBtn.textContent = "🗑️";
+  removeBtn.onclick = () => {
+    exclusiveGroups[item.group!].splice(
+      exclusiveGroups[item.group!].findIndex((i) => i.id === item.id),
+      1
+    );
+    saveItems();
+    renderLists();
+  };
+
+  li.appendChild(input);
+  li.appendChild(editBtn);
+  li.appendChild(removeBtn);
+  exclusiveGroup.appendChild(li);
+
+  // Se o item estiver em edição, dê foco ao input
+  if (item.isEditing) {
+    setTimeout(() => {
+      input.focus(); // Dá o foco ao input de edição
+    }, 0);
+  }
+}
+
+
+function addNewExclusiveGroup(): void {
+  const groupName = prompt("Nome do novo grupo exclusivo:");
+  if (!groupName || exclusiveGroups[groupName]) return;
+  
+  exclusiveGroups[groupName] = [];
+  saveItems();
+  renderLists();
+}
+
+function addExclusiveGroup(groupName: string, itemsInGroup: Item[]): void {
+  const card = document.createElement("div");
+  card.className = "card bg-dark text-white mb-3";
+
+  const cardHeader = document.createElement("div");
+  cardHeader.className = "card-header d-flex justify-content-between align-items-center";
+
+  const span = document.createElement("span");
+  span.className = "text-warning";
+  span.textContent = groupName;
+
+  const addItemBtn = document.createElement("button");
+  addItemBtn.className = "btn btn-success btn-sm";
+  addItemBtn.textContent = "+";
+  addItemBtn.onclick = () => addItemToExclusiveGroup(groupName);
+
+  const removeGroupBtn = document.createElement("button");
+  removeGroupBtn.className = "btn btn-danger btn-sm";
+  removeGroupBtn.textContent = "🗑️"
+  removeGroupBtn.onclick = () => removeExclusiveGroup(groupName);
+
+  const divbtn = document.createElement("div");
+  divbtn.className = "d-flex gap-2";
+  divbtn.appendChild(addItemBtn);
+  divbtn.appendChild(removeGroupBtn);
+
+  const ul = document.createElement("ul");
+  ul.className = "list-group list-group-flush bg-dark";
+  
+  itemsInGroup.forEach((item) => addExclusiveGroupItem(item, ul));
+
+  cardHeader.appendChild(span);
+  cardHeader.appendChild(divbtn);
+  card.appendChild(cardHeader);
+  card.appendChild(ul);
+  exclusiveContainer.appendChild(card);
+}
+
+function addItemToExclusiveGroup(groupName: string): void {
+  const newItem: Item = { id: Date.now(), name: "", isEditing: true, group: groupName };
+  exclusiveGroups[groupName].push(newItem);
+  saveItems();
+  renderLists();
+
+  // Aguarde o DOM ser atualizado e foque no último item
+  setTimeout(() => {
+    // Encontre o grupo pelo nome
+    const exclusiveGroupCard = Array.from(exclusiveContainer.getElementsByClassName('card'))
+      .find(card => card.querySelector('.card-header span')?.textContent === groupName);
+
+    if (exclusiveGroupCard) {
+      const ul = exclusiveGroupCard.querySelector('ul');
+      // Pega o último item do ul
+      const lastItemInput = ul?.querySelector('li:last-child input');
+      if (lastItemInput) {
+        (lastItemInput as HTMLInputElement).focus(); // Focar no input do último item
+      }
+    }
+  }, 0); // Garantir que o foco seja definido depois da renderização
+}
+
+
+
 
 
 function removeItem(id: number): void {
@@ -160,31 +240,55 @@ function removeItem(id: number): void {
   renderLists();
 }
 
-function removeExclusiveGroup(group: string): void {
-  exclusiveGroups = exclusiveGroups.filter((g) => g !== group);
+function removeExclusiveGroup(groupName: string): void {
+  delete exclusiveGroups[groupName];
   saveItems();
   renderLists();
 }
 
-// Função para adicionar novo item na lista
+function draw(qtd: number): void {
+  if (qtd <= 0) {
+    resultDiv.textContent = "Por favor, insira um número válido.";
+    return;
+  }
+
+  let availableItems = items.concat(...Object.values(exclusiveGroups));
+
+  if (availableItems.length === 0) {
+    resultDiv.textContent = "Nenhum item disponível para sorteio.";
+    return;
+  }
+
+  const selectedItems: Item[] = [];
+
+  while (selectedItems.length < qtd && availableItems.length > 0) {
+    const randomIndex = Math.floor(Math.random() * availableItems.length);
+    const winner = availableItems[randomIndex];
+
+    selectedItems.push(winner);
+    availableItems.splice(randomIndex, 1);
+
+    if (winner.group) {
+      availableItems = availableItems.filter(item => item.group !== winner.group);
+    }
+  }
+
+  resultDiv.textContent = `Os vencedores são: ${selectedItems.map((item) => item.name).join(", ")}`;
+}
+
 addGeneralBtn.addEventListener("click", () => {
-  if (isEditingItem) return; // Impede a adição de novos itens se algum item está sendo editado
-  const newItem: Item = { id: Date.now(), name: "Novo item", isEditing: true };  // Define como item em edição ao ser criado
+  if (isEditingItem) return;
+  const newItem: Item = { id: Date.now(), name: "", isEditing: true };
   items.push(newItem);
-  isEditingItem = true; // Marca que estamos criando um item
+  isEditingItem = true;
   saveItems();
   renderLists();
+});  
+
+addNewExclusiveGroupBtn.addEventListener("click", addNewExclusiveGroup);
+drawBtn.addEventListener("click", () => {
+  const qtd = numToDrawElement ? parseInt(numToDrawElement.value, 10) : 0;
+  draw(qtd);
 });
 
-// Função para adicionar um novo grupo exclusivo
-addExclusiveGroupBtn.addEventListener("click", () => {
-  if (isEditingGroup) return; // Impede a adição de novos grupos se algum grupo está sendo editado
-  const newGroup = "Novo grupo exclusivo";
-  exclusiveGroups.push(newGroup);
-  isEditingGroup = true; // Marca que estamos criando um grupo
-  saveItems();
-  renderLists();
-});
-
-// Chama loadItems para carregar os itens quando a página for recarregada
 loadItems();
