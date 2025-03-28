@@ -215,12 +215,23 @@ function removeExclusiveGroup(groupName) {
     saveItems();
     renderLists();
 }
+// Função de sorteio modificada para tratar os grupos exclusivos corretamente
 function draw(qtd) {
     if (qtd <= 0) {
         resultDiv.textContent = "Por favor, insira um número válido.";
         return;
     }
-    let availableItems = items.concat(...Object.values(exclusiveGroups));
+    let availableItems = [];
+    // Adicionando os itens gerais
+    availableItems = availableItems.concat(items.filter(item => !item.group));
+    // Adicionando os grupos exclusivos como itens únicos (não se expande para os itens do grupo)
+    Object.keys(exclusiveGroups).forEach(groupName => {
+        availableItems.push({
+            id: Date.now() + Math.random(),
+            name: groupName, // Usamos o nome do grupo para representar o grupo inteiro
+            group: groupName
+        });
+    });
     // Filtrando apenas os itens não fixos para que os fixos sejam sempre sorteados
     const fixedItems = availableItems.filter(item => item.isFixed);
     const nonFixedItems = availableItems.filter(item => !item.isFixed);
@@ -253,7 +264,19 @@ function draw(qtd) {
     }
     // Adiciona os itens fixos ao resultado
     selectedItems.unshift(...fixedItems);
-    resultDiv.textContent = `Os vencedores são: ${selectedItems.map((item) => item.name).join(", ")}`;
+    // Agora, precisamos sortear um item de cada grupo exclusivo, se o grupo for sorteado
+    const resultItems = selectedItems.map(item => {
+        if (item.group) {
+            // Se o item for de um grupo exclusivo, sorteie um item desse grupo
+            const groupItems = exclusiveGroups[item.group];
+            const randomIndex = Math.floor(Math.random() * groupItems.length);
+            return groupItems[randomIndex];
+        }
+        else {
+            return item;
+        }
+    });
+    resultDiv.textContent = `Os vencedores são: ${resultItems.map((item) => item.name).join(", ")}`;
 }
 addGeneralBtn.addEventListener("click", () => {
     if (isEditingItem)
